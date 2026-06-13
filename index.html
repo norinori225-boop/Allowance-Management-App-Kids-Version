@@ -8,7 +8,7 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="カード">
+  <meta name="apple-mobile-web-app-title" content="スタンプ">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
 
 <title>おこづかいスタンプ</title>
@@ -140,29 +140,10 @@
   .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px);}
 
   .bigqr{display:flex;flex-direction:column;align-items:center;}
-  .bigqr img{width:230px;height:230px;image-rendering:pixelated;background:#fff;padding:8px;border-radius:10px;box-shadow:0 4px 12px var(--shadow);}
-
-  /* 全画面の大きいQR（読み取りやすさ最優先：白背景＋大きく＋余白） */
-  .qr-modal{position:fixed;inset:0;background:#fff;z-index:60;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:16px;}
-  .qr-modal h2{margin:0 0 10px;color:#3a2c1a;font-size:18px;text-align:center;}
-  .qr-modal img{width:min(88vw,72vh);height:auto;image-rendering:pixelated;background:#fff;}
-  .qr-modal .note{color:#7a6747;font-size:13px;text-align:center;margin-top:14px;}
-  .qr-modal .btn{max-width:340px;margin-top:18px;}
+  .bigqr img{width:min(82vw,320px);height:auto;image-rendering:pixelated;background:#fff;padding:10px;border-radius:10px;box-shadow:0 4px 12px var(--shadow);}
   .muted{font-size:12px;color:#7a6747;text-align:center;margin-top:8px;}
   .back{background:none;color:#6b5530;font-size:13px;font-weight:700;padding:8px;margin-bottom:6px;text-decoration:underline;}
   .hint{font-size:11px;color:#8a7650;background:#fffaf0;border:1px dashed #d7c193;border-radius:10px;padding:10px;margin-top:10px;line-height:1.5;}
-
-  /* ===== settings: card color picker ===== */
-  .color-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:6px;}
-  .color-cell{
-    position:relative;aspect-ratio:1/1;border-radius:50%;cursor:pointer;
-    border:3px solid #fff;box-shadow:0 2px 6px var(--shadow);
-  }
-  .color-cell.sel{box-shadow:0 0 0 3px var(--stamp),0 2px 6px var(--shadow);}
-  .color-cell.sel::after{
-    content:"✓";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-    font-size:18px;font-weight:900;color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.5);
-  }
 </style>
 <style>.back{display:none!important;}</style>
 </head>
@@ -210,23 +191,7 @@
     <button class="btn" onclick="childScan()">📷 親の更新QRを受け取る</button>
     <div class="row2">
       <button class="btn ghost small" onclick="childSettings()">⚙ 設定・編集</button>
-      <button class="btn ghost small" onclick="enlargeChildQR()">🔍 QRを大きく表示</button>
-    </div>
-  </section>
-
-  <!-- CHILD SETTINGS -->
-  <section id="screen-settings" class="hidden">
-    <button class="back" onclick="enterChild()">← もどる</button>
-    <h1>せってい</h1>
-    <div class="card-box">
-      <label>なまえ</label>
-      <input id="set-name" type="text" placeholder="たろう" maxlength="12">
-      <label>毎月のおこづかい（円）</label>
-      <input id="set-amount" type="number" placeholder="500" min="0" step="50">
-      <label>カードのいろ</label>
-      <div id="color-grid" class="color-grid"></div>
-      <div style="height:14px"></div>
-      <button class="btn" onclick="saveSettings()">ほぞんする</button>
+      <button class="btn ghost small" onclick="enlargeChildQR()">🔍 QRを拡大</button>
     </div>
   </section>
 
@@ -272,14 +237,6 @@
   <input id="file-input" type="file" accept="image/*" class="hidden">
 </div>
 
-<!-- 大きいQR表示モーダル -->
-<div id="qr-modal" class="qr-modal hidden">
-  <h2 id="qrm-title"></h2>
-  <div id="qrm-img"></div>
-  <p class="note">親モードのカメラで、このQRを読み取ってください</p>
-  <button class="btn kraft" onclick="closeBigQR()">とじる</button>
-</div>
-
 <canvas id="work" class="hidden"></canvas>
 <div id="toast" class="toast"></div>
 
@@ -320,16 +277,15 @@ function toast(msg){
   clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.classList.remove('show'),1900);
 }
 function show(id){
-  ['screen-home','screen-child-setup','screen-child','screen-settings','screen-parent'].forEach(s=>$(s).classList.add('hidden'));
+  ['screen-home','screen-child-setup','screen-child','screen-parent'].forEach(s=>$(s).classList.add('hidden'));
   $(id).classList.remove('hidden');
   window.scrollTo(0,0);
 }
 
 /* ================= navigation ================= */
-function goHome(){ closeScanner(); enterChild(); }
+function goHome(){ closeScanner(); enterParent(); }
 
 function enterChild(){
-  applyColor(loadColor()); /* 設定をプレビュー後に保存せず戻った場合は元に戻す */
   const s = loadChild();
   if(s){ renderChild(s); show('screen-child'); }
   else { show('screen-child-setup'); }
@@ -400,65 +356,13 @@ function escapeHTML(t){ return String(t).replace(/[&<>"]/g,c=>({'&':'&amp;','<':
 function renderChild(s){
   $('env').innerHTML = envelopeHTML(s, false);
 }
-/* ===== card color ===== */
-/* カードのいろ候補（id をキーに保存。kraft=明るい側 / kraft2=濃い側） */
-const CARD_COLORS = [
-  { id:"kraft",  name:"クラフト", kraft:"#d9c08c", kraft2:"#cbab6e" },
-  { id:"pink",   name:"ピンク",   kraft:"#f6bcce", kraft2:"#ec90ab" },
-  { id:"blue",   name:"みずいろ", kraft:"#aed6ec", kraft2:"#7db8d9" },
-  { id:"green",  name:"みどり",   kraft:"#c4e3a3", kraft2:"#98c96a" },
-  { id:"purple", name:"むらさき", kraft:"#d4c0ec", kraft2:"#b095db" },
-  { id:"yellow", name:"きいろ",   kraft:"#f4dd8e", kraft2:"#ecc859" },
-  { id:"orange", name:"オレンジ", kraft:"#f6c994", kraft2:"#eda85f" },
-  { id:"mint",   name:"ミント",   kraft:"#aee6d4", kraft2:"#74cdb1" }
-];
-const COLOR_KEY = "okozukai_child_color_v1";
-function findColor(id){ return CARD_COLORS.find(c=>c.id===id) || CARD_COLORS[0]; }
-function loadColor(){ try{ return localStorage.getItem(COLOR_KEY) || "kraft"; }catch(e){ return "kraft"; } }
-function saveColor(id){ try{ localStorage.setItem(COLOR_KEY, id||"kraft"); }catch(e){} }
-function applyColor(id){
-  const c = findColor(id);
-  const root = document.documentElement.style;
-  root.setProperty('--kraft', c.kraft);
-  root.setProperty('--kraft2', c.kraft2);
-}
-
-let pendingColor = "kraft";
-function renderColorGrid(current){
-  pendingColor = current;
-  $('color-grid').innerHTML = CARD_COLORS.map(c=>{
-    const sel = (c.id===current) ? 'sel' : '';
-    const bg = `linear-gradient(160deg,${c.kraft},${c.kraft2})`;
-    return `<div class="color-cell ${sel}" data-color="${c.id}" title="${c.name}" style="background:${bg}" onclick="pickColor('${c.id}')"></div>`;
-  }).join('');
-}
-function pickColor(id){
-  pendingColor = id;
-  applyColor(id); /* タップですぐにプレビュー */
-  document.querySelectorAll('#color-grid .color-cell').forEach(c=>{
-    c.classList.toggle('sel', c.getAttribute('data-color') === id);
-  });
-}
-
 function childSettings(){
   const s=loadChild(); if(!s) return;
-  $('set-name').value = s.name;
-  $('set-amount').value = s.amount;
-  renderColorGrid(loadColor());
-  show('screen-settings');
-}
-function saveSettings(){
-  const s=loadChild(); if(!s){ goHome(); return; }
-  const nm = $('set-name').value.trim();
-  const am = parseInt($('set-amount').value,10);
-  if(nm) s.name = nm;
-  if(!isNaN(am)) s.amount = am;
-  saveChild(s);
-  saveColor(pendingColor);
-  applyColor(pendingColor);
-  renderChild(s);
-  show('screen-child');
-  toast("ほぞんしました");
+  const nm = prompt("なまえ", s.name); if(nm===null) return;
+  const am = prompt("毎月のおこづかい（円）", s.amount); if(am===null) return;
+  s.name = nm.trim()||s.name;
+  const a=parseInt(am,10); if(!isNaN(a)) s.amount=a;
+  saveChild(s); renderChild(s); toast("ほぞんしました");
 }
 function enlargeChildQR(){
   const s=loadChild(); if(!s) return;
@@ -519,22 +423,24 @@ function showUpdateQR(){
   $('parent-edit').classList.add('hidden');
   $('parent-qr').classList.remove('hidden');
   $('pq-title').textContent = parentState.name+" に渡す";
-  $('pq-img').innerHTML = `<img src="${makeQR(encodeState(parentState),6,2)}" alt="更新QR">`;
+  $('pq-img').innerHTML = `<img src="${makeQR(encodeState(parentState),8,4)}" alt="更新QR">`;
 }
 function backToEdit(){
   $('parent-qr').classList.add('hidden');
   $('parent-edit').classList.remove('hidden');
 }
 
-/* ================= big QR view（全画面・大きく表示して読み取りやすく） ====== */
+/* ================= big QR view (reuse parent-qr area not available on child) ====== */
 function showBigQR(text, title){
+  // simple modal via overlay reuse
+  const ov=$('overlay');
   closeScanner();
-  $('qrm-title').textContent = title;
-  // cell=8 で大きく、margin=4 でクワイエットゾーンを広めにして読み取り精度を上げる
-  $('qrm-img').innerHTML = `<img src="${makeQR(text,8,4)}" alt="QR">`;
-  $('qr-modal').classList.remove('hidden');
+  ov.innerHTML = `<div class="card-box bigqr"><h2 style="margin:4px 0 12px">${escapeHTML(title)}</h2>
+     <img src="${makeQR(text,8,4)}"><p class="muted">親モードで読み取ってください</p></div>
+     <button class="btn kraft" style="max-width:340px" onclick="restoreOverlayAndClose()">とじる</button>`;
+  ov.classList.remove('hidden');
 }
-function closeBigQR(){ $('qr-modal').classList.add('hidden'); }
+function restoreOverlayAndClose(){ location.reload(); }
 
 /* ================= scanner ================= */
 let stream=null, scanning=false, onResult=null, rafId=null;
@@ -543,9 +449,23 @@ function openScanner(cb){
   $('overlay').classList.remove('hidden');
   $('scan-msg').textContent="カメラを起動しています…";
   const video=$('video');
-  navigator.mediaDevices.getUserMedia({video:{facingMode:'environment'}})
+  // 高解像度＋連続オートフォーカスを要求して読み取り精度を上げる
+  const constraints={video:{
+    facingMode:{ideal:'environment'},
+    width:{ideal:1920}, height:{ideal:1080},
+    focusMode:'continuous'
+  }};
+  navigator.mediaDevices.getUserMedia(constraints)
     .then(st=>{
       stream=st; video.srcObject=st; video.setAttribute('playsinline',true);
+      // 対応端末では連続オートフォーカスを明示的に有効化
+      try{
+        const track=st.getVideoTracks()[0];
+        const caps=track.getCapabilities?track.getCapabilities():{};
+        const adv=[];
+        if(caps.focusMode && caps.focusMode.indexOf('continuous')>=0) adv.push({focusMode:'continuous'});
+        if(adv.length) track.applyConstraints({advanced:adv}).catch(function(){});
+      }catch(e){}
       video.play(); scanning=true; $('scan-msg').textContent="QRを枠に合わせてください…";
       tick();
     })
@@ -561,7 +481,7 @@ function tick(){
     const ctx=canvas.getContext('2d');
     ctx.drawImage(video,0,0,canvas.width,canvas.height);
     const img=ctx.getImageData(0,0,canvas.width,canvas.height);
-    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:"dontInvert"});
+    const code=jsQR(img.data,img.width,img.height,{inversionAttempts:"attemptBoth"});
     if(code && code.data){
       const handled = onResult && onResult(code.data);
       if(handled){ return; }
@@ -577,7 +497,7 @@ $('file-input').addEventListener('change',e=>{
     const canvas=$('work'); canvas.width=img.width; canvas.height=img.height;
     const ctx=canvas.getContext('2d'); ctx.drawImage(img,0,0);
     const d=ctx.getImageData(0,0,img.width,img.height);
-    const code=jsQR(d.data,d.width,d.height);
+    const code=jsQR(d.data,d.width,d.height,{inversionAttempts:"attemptBoth"});
     if(code && code.data && onResult){ onResult(code.data); }
     else toast("QRを読み取れませんでした");
     e.target.value="";
@@ -591,8 +511,8 @@ function closeScanner(){
   $('overlay').classList.add('hidden');
 }
 
-/* init: child app */
-(function(){ applyColor(loadColor()); var s=loadChild(); if(s){ renderChild(s); show('screen-child'); } else { show('screen-child-setup'); } })();
+/* init: parent app */
+enterParent();
 </script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script>
 </body>
